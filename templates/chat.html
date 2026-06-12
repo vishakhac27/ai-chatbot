@@ -17,15 +17,11 @@
 <div class="chat-wrapper">
     <div class="sidebar">
 
-        <button class="new-chat-btn">
-            + New Chat
-        </button>
+       <button class="new-chat-btn" onclick="newChat()">
+    + New Chat
+</button>
 
-        <div class="chat-history">
-            <div class="chat-item">Chat 1</div>
-            <div class="chat-item">Career Advice</div>
-            <div class="chat-item">Python Learning</div>
-        </div>
+       <div class="chat-history" id="chatHistory"></div>
        <div class="back-btn"> 
         <a href="/" class="btn btn-light w-100">
          Back
@@ -54,6 +50,8 @@
 </div>
 
 <script>
+
+  
 async function send() {
     let input = document.getElementById("input");
     let msg = input.value.trim();
@@ -62,14 +60,14 @@ async function send() {
 
     let messages = document.getElementById("messages");
 
-    // USER MESSAGE
+  
     messages.innerHTML += `
         <div class="msg user">${msg}</div>
     `;
 
     input.value = "";
 
-    // Scroll update
+  
     messages.scrollTop = messages.scrollHeight;
 
     try {
@@ -122,6 +120,99 @@ document.getElementById("input").addEventListener("keypress", function(event) {
         send();
     }
 });
+
+  async function newChat() {
+    let res = await fetch("/new-chat");
+    let data = await res.json();
+
+    document.getElementById("messages").innerHTML = "";
+
+    loadHistory(); 
+}
+
+async function loadHistory() {
+    let res = await fetch("/history");
+    let data = await res.json();
+
+    let container = document.getElementById("chatHistory");
+    container.innerHTML = "";
+
+    data.forEach(chat => {
+        container.innerHTML += `
+            <div class="chat-item" 
+                 data-id="${chat.id}" 
+                 onclick="openChat('${chat.id}')">
+                ${chat.title}
+            </div>
+        `;
+    });
+}
+
+async function openChat(chatId) {
+
+    let res = await fetch(`/load-chat/${chatId}`);
+    let data = await res.json();
+
+    let messages = document.getElementById("messages");
+    messages.innerHTML = "";
+
+    data.messages.forEach(m => {
+
+        if (m.role === "user") {
+            messages.innerHTML += `
+                <div class="msg user">${m.content}</div>
+            `;
+        } else {
+            let r = m.content;
+
+            messages.innerHTML += `
+                <div class="msg bot">
+                    <b>${r.title || ""}</b><br><br>
+                    ${r.summary || ""}<br><br>
+
+                    ${r.points?.length ? `
+                        <b>Key Points:</b><br>
+                        ${r.points.map(p => "• " + p).join("<br>")}
+                        <br><br>
+                    ` : ""}
+
+                    ${r.career ? `<b>Career:</b> ${r.career}` : ""}
+                </div>
+            `;
+        }
+    });
+
+    messages.scrollTop = messages.scrollHeight;
+
+  
+    document.querySelectorAll(".chat-item").forEach(el => {
+        el.classList.remove("active");
+    });
+
+    document.querySelector(`[data-id="${chatId}"]`)?.classList.add("active");
+}
+async function newChat() {
+    let res = await fetch("/new-chat");
+    let data = await res.json();
+
+    document.getElementById("messages").innerHTML = "";
+
+    loadHistory(); 
+}
+
+async function autoOpenLastChat() {
+    let res = await fetch("/history");
+    let data = await res.json();
+
+    if (data.length > 0) {
+        let lastChat = data[data.length - 1];
+        openChat(lastChat.id);
+    }
+}
+
+window.onload = async function () {
+    await loadHistory();
+};
 </script>
 
 </body>

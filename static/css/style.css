@@ -37,9 +37,14 @@
     padding:20px;
     display:flex;
     flex-direction:column;
-    height:100vh;
+
     border-right:1px solid #e5e7eb;
      box-shadow: 0 0 20px rgba(44, 44, 44, 0.08);
+
+     height: 100vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 5px;
 }
 
 
@@ -58,6 +63,23 @@
     display:flex;
     flex-direction:column;
     gap:10px;
+}
+
+.sidebar::-webkit-scrollbar {
+    width: 6px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 10px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+    background: #555;
 }
 
 .chat-item{
