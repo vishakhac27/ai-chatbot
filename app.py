@@ -231,5 +231,23 @@ def chatbot():
 
     return render_template("chat.html")
 
+@app.route("/delete-chat/<chat_id>", methods=["POST"])
+def delete_chat(chat_id):
+
+    all_sessions = session.get("all_chat_sessions", {})
+    saved_chats = session.get("saved_chats", [])
+
+    all_sessions.pop(chat_id, None)
+
+    saved_chats = [c for c in saved_chats if c["id"] != chat_id]
+
+    session["all_chat_sessions"] = all_sessions
+    session["saved_chats"] = saved_chats
+
+    if session.get("current_chat_id") == chat_id:
+        session["current_chat_id"] = None
+
+    return jsonify({"success": True})
+
 if __name__ == "__main__":
     app.run(debug=True)

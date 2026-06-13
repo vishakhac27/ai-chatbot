@@ -135,81 +135,32 @@ document.addEventListener("DOMContentLoaded", function () {
     loadHistory(); 
 }
 
-async function loadHistory() {
-    let res = await fetch("/history");
-    let data = await res.json();
+function loadHistory() {
+    fetch("/history")
+        .then(res => res.json())
+        .then(data => {
 
-    let container = document.getElementById("chatHistory");
-    container.innerHTML = "";
+            let container = document.getElementById("chatHistory");
+            container.innerHTML = "";
 
-    data.forEach(chat => {
-        container.innerHTML += `
-            <div class="chat-item" 
-                 data-id="${chat.id}" 
-                 onclick="openChat('${chat.id}')">
-                ${chat.title}
-            </div>
-        `;
-    });
-}
+            data.forEach(chat => {
 
-async function openChat(chatId) {
+                container.innerHTML += `
+                    <div class="chat-item" data-id="${chat.id}">
 
-    let res = await fetch(`/load-chat/${chatId}`);
-    let data = await res.json();
+                        <div class="chat-left" onclick="openChat('${chat.id}')">
+                             ${chat.title}
+                        </div>
 
-    let messages = document.getElementById("messages");
-    messages.innerHTML = "";
+                        <button class="delete-btn"
+                            onclick="deleteChat('${chat.id}', event)">
+                            🗑
+                        </button>
 
-    data.messages.forEach(m => {
-
-        // USER MESSAGE
-        if (m.role === "user") {
-            messages.innerHTML += `
-                <div class="msg user">${m.content}</div>
-            `;
-        }
-
-        else {
-
-            let r = m.content;
-
-            if (typeof r === "string") {
-                try {
-                    r = JSON.parse(r);
-                } catch (e) {
-                    r = { text: r };
-                }
-            }
-
-            messages.innerHTML += `
-                <div class="msg bot">
-
-                    ${r.title ? `<b>${r.title}</b><br><br>` : ""}
-
-                    ${r.summary || r.text || ""}<br><br>
-
-                    ${r.points && Array.isArray(r.points) ? `
-                        <b>Key Points:</b><br>
-                        ${r.points.map(p => "• " + p).join("<br>")}
-                        <br><br>
-                    ` : ""}
-
-                    ${r.career ? `<b>Career:</b> ${r.career}` : ""}
-
-                </div>
-            `;
-        }
-    });
-
-    messages.scrollTop = messages.scrollHeight;
-
-  
-    document.querySelectorAll(".chat-item").forEach(el => {
-        el.classList.remove("active");
-    });
-
-    document.querySelector(`[data-id="${chatId}"]`)?.classList.add("active");
+                    </div>
+                `;
+            });
+        });
 }
 async function newChat() {
     let res = await fetch("/new-chat");
@@ -227,6 +178,27 @@ async function autoOpenLastChat() {
     if (data.length > 0) {
         let lastChat = data[data.length - 1];
         openChat(lastChat.id);
+    }
+}
+
+async function deleteChat(chatId, event) {
+    event.stopPropagation();
+
+    try {
+        let res = await fetch(`/delete-chat/${chatId}`, {
+            method: "POST"
+        });
+
+        let data = await res.json();
+        console.log("DELETE RESPONSE:", data);
+
+        if (data.success) {
+            loadHistory();  // refresh sidebar
+            document.getElementById("messages").innerHTML = "";
+        }
+
+    } catch (error) {
+        console.error("Delete failed:", error);
     }
 }
 

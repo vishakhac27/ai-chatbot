@@ -82,13 +82,40 @@
     background: #555;
 }
 
-.chat-item{
-    background:#f3f4f6;
-    color:#111827;
-    padding:12px;
-    border-radius:10px;
-    cursor:pointer;
-    transition:0.3s;
+.chat-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.chat-left {
+    flex: 1;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+
+.delete-btn {
+    margin-left: auto;         
+    background: transparent;     
+    border: none;
+    color: #090909;
+    cursor: pointer;
+    font-size: 14px;
+    padding: 4px;
+    opacity: 0.6;
+    transition: 0.2s;
+}
+
+.delete-btn:hover {
+    opacity: 1;
+    color: rgb(13, 3, 3);
+    transform: scale(1.1);
+    background-color: transparent;
 }
 
 .chat-item:hover{
