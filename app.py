@@ -6,6 +6,9 @@ from flask import Flask, render_template, request, jsonify, session
 from openai import OpenAI
 from dotenv import load_dotenv
 
+from flask_session import Session
+
+
 load_dotenv()
 
 app = Flask(__name__)
@@ -16,8 +19,12 @@ client = OpenAI(
     base_url="https://api.groq.com/openai/v1"
 )
 
+app.config["SESSION_TYPE"] = "filesystem"
+Session(app)
 
-
+all_sessions = {}
+saved_chats = []
+ 
 def init_memory():
     session.setdefault("saved_chats", [])
     session.setdefault("all_chat_sessions", {})
@@ -47,28 +54,23 @@ def get_ai_response(chat_history, message):
 
     try:
         system_prompt = """
-You are a helpful AI chatbot.
+You are a chatbot that MUST return ONLY valid JSON.
 
-Always return valid JSON.
+STRICT RULES:
+- Output ONLY JSON (no text, no markdown, no explanation)
+- Always use double quotes for keys and strings
+- Never use single quotes
+- Never return Python dictionary format
 
-Format:
-
+Required format:
 {
-  "title": "string",
-  "summary": "string",
-  "points": ["string"],
-  "career": "string"
+  "title": "...",
+  "summary": "...",
+  "points": ["...", "..."],
+  "career": "..."
 }
 
-Rules:
-- Never return empty JSON fields.
-- Always provide a title.
-- Always provide a summary.
-- If there are no key points, return at least one point.
-- If career is not relevant, return an empty string "".
-- No markdown.
-- No explanations outside JSON.
-- For greetings like hi, hello, hey:
+If greeting:
 {
   "title": "Greeting",
   "summary": "Hello! How can I help you today?",
@@ -79,10 +81,11 @@ Rules:
         messages = [{"role": "system", "content": system_prompt}]
 
         for chat in chat_history:
-            messages.append({
-                "role": chat["role"],
-                "content": str(chat["content"])
-            })
+           messages.append({
+    "role": chat["role"],
+    "content": chat["content"] if isinstance(chat["content"], str)
+    else json.dumps(chat["content"])
+})
 
         messages.append({"role": "user", "content": message})
 
@@ -111,12 +114,19 @@ Rules:
 def home():
     return render_template("home.html")
 
-
+def safe_session():
+    if "all_chat_sessions" not in session:
+        session["all_chat_sessions"] = {}
+    if "saved_chats" not in session:
+        session["saved_chats"] = []
+    if "current_chat_id" not in session:
+        session["current_chat_id"] = None
 
 @app.route("/chat", methods=["POST"])
 def chat():
 
     init_memory()
+    safe_session()
 
     data = request.json or {}
     user_message = data.get("message")
@@ -125,9 +135,8 @@ def chat():
     if not user_message:
         return jsonify({"error": "Empty message"}), 400
 
-    # SAFE INIT (prevents crash)
-    all_sessions = session.get("all_chat_sessions", {})
-    saved_chats = session.get("saved_chats", [])
+    all_sessions = session["all_chat_sessions"]
+    saved_chats = session["saved_chats"]
 
     if not chat_id:
         chat_id = str(uuid.uuid4())
@@ -151,24 +160,28 @@ def chat():
         reply = get_ai_response(chat_history, user_message)
     except Exception as e:
         print("AI ERROR:", e)
-        return jsonify({"error": "AI failed"}), 500
+        return jsonify({
+            "reply": {
+                "title": "Error",
+                "summary": "AI failed",
+                "points": [],
+                "career": ""
+            },
+            "chat_id": chat_id
+        }), 500
+
 
     chat_history.append({
         "role": "assistant",
-        "content": str(reply)
+        "content": reply
     })
 
-    all_sessions[chat_id] = chat_history
-
-    session["all_chat_sessions"] = all_sessions
-    session["saved_chats"] = saved_chats
     session["current_chat_id"] = chat_id
 
     return jsonify({
         "reply": reply,
         "chat_id": chat_id
     })
-
 @app.route("/history")
 def history():
     saved_chats = session.get("saved_chats", [])
@@ -184,47 +197,23 @@ def reset():
 @app.route("/load-chat/<chat_id>")
 def load_chat(chat_id):
 
-    init_memory()
+    safe_session()
 
-    session["current_chat_id"] = chat_id   
-
-    all_sessions = session.get("all_chat_sessions", {})
+    all_sessions = session["all_chat_sessions"]
     messages = all_sessions.get(chat_id, [])
 
-    fixed = []
-
-    for m in messages:
-        if m["role"] == "assistant":
-            try:
-                content = json.loads(m["content"])
-            except:
-                content = m["content"]
-        else:
-            content = m["content"]
-
-        fixed.append({
-            "role": m["role"],
-            "content": content
-        })
-
-    return jsonify({"messages": fixed})
-
+    return jsonify({
+        "messages": messages
+    })
 @app.route("/new-chat")
 def new_chat():
 
+    safe_session()
+
     chat_id = str(uuid.uuid4())
 
- 
-    all_sessions = session.get("all_chat_sessions", {})
-    saved_chats = session.get("saved_chats", [])
+    session["all_chat_sessions"][chat_id] = []
 
-
-    all_sessions[chat_id] = []
-
-
-
-    session["all_chat_sessions"] = all_sessions
-    session["saved_chats"] = saved_chats
     session["current_chat_id"] = chat_id
 
     return jsonify({"chat_id": chat_id})

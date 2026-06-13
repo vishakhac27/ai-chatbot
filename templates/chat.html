@@ -52,6 +52,9 @@
 <script>
 
   
+
+   let currentChatId = null;
+
 async function send() {
     let input = document.getElementById("input");
     let msg = input.value.trim();
@@ -60,15 +63,11 @@ async function send() {
 
     let messages = document.getElementById("messages");
 
-  
     messages.innerHTML += `
         <div class="msg user">${msg}</div>
     `;
 
     input.value = "";
-
-  
-    messages.scrollTop = messages.scrollHeight;
 
     try {
         let res = await fetch("/chat", {
@@ -76,28 +75,32 @@ async function send() {
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify({ message: msg })
+            body: JSON.stringify({
+                message: msg,
+                chat_id: currentChatId
+            })
         });
 
         let data = await res.json();
 
+        currentChatId = data.chat_id;
+
         let reply = data.reply;
 
-   
         messages.innerHTML += `
             <div class="msg bot">
 
-                ${reply.title ? `<b>${reply.title}</b><br><br>` : ""}
+                <b>${reply.title || ""}</b><br><br>
 
                 ${reply.summary || ""}<br><br>
 
-                ${reply.points && reply.points.length ? `
+                ${reply.points?.length ? `
                     <b>Key Points:</b><br>
-                    ${reply.points.map(p => `• ${p}`).join("<br>")}
+                    ${reply.points.map(p => "• " + p).join("<br>")}
                     <br><br>
                 ` : ""}
 
-                ${reply.career ? `<b>Career:</b> ${reply.career}` : ""}
+                ${reply.career ? `<b>Career:</b> ${reply.career}</div>` : ""}
 
             </div>
         `;
@@ -105,6 +108,7 @@ async function send() {
         messages.scrollTop = messages.scrollHeight;
 
     } catch (error) {
+        console.error(error);
         messages.innerHTML += `
             <div class="msg bot" style="color:red;">
                 Error: Could not get response
@@ -114,13 +118,14 @@ async function send() {
 }
 
 
-document.getElementById("input").addEventListener("keypress", function(event) {
-    if (event.key === "Enter") {
-        event.preventDefault();
-        send();
-    }
+document.addEventListener("DOMContentLoaded", function () {
+    document.getElementById("input").addEventListener("keydown", function (event) {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            send();
+        }
+    });
 });
-
   async function newChat() {
     let res = await fetch("/new-chat");
     let data = await res.json();
@@ -158,25 +163,40 @@ async function openChat(chatId) {
 
     data.messages.forEach(m => {
 
+        // USER MESSAGE
         if (m.role === "user") {
             messages.innerHTML += `
                 <div class="msg user">${m.content}</div>
             `;
-        } else {
+        }
+
+        else {
+
             let r = m.content;
+
+            if (typeof r === "string") {
+                try {
+                    r = JSON.parse(r);
+                } catch (e) {
+                    r = { text: r };
+                }
+            }
 
             messages.innerHTML += `
                 <div class="msg bot">
-                    <b>${r.title || ""}</b><br><br>
-                    ${r.summary || ""}<br><br>
 
-                    ${r.points?.length ? `
+                    ${r.title ? `<b>${r.title}</b><br><br>` : ""}
+
+                    ${r.summary || r.text || ""}<br><br>
+
+                    ${r.points && Array.isArray(r.points) ? `
                         <b>Key Points:</b><br>
                         ${r.points.map(p => "• " + p).join("<br>")}
                         <br><br>
                     ` : ""}
 
                     ${r.career ? `<b>Career:</b> ${r.career}` : ""}
+
                 </div>
             `;
         }
